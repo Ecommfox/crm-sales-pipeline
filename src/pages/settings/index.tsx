@@ -11,7 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle2, RotateCcw, Save } from "lucide-react";
+import { CheckCircle2, RotateCcw, Save, Wifi } from "lucide-react";
+import { RealtimeStatusIndicator } from "@/components/realtime-status-indicator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const CRITERIA = [
   {
@@ -90,6 +92,30 @@ export default function SettingsPage() {
 
       <Separator />
 
+      {/* Real-time Status */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Wifi className="h-4 w-4" />
+            État de la connexion
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Connexion Supabase</span>
+            <RealtimeStatusIndicator />
+          </div>
+          <Alert>
+            <AlertDescription className="text-sm">
+              Les mises à jour en temps réel sont activées. Les données se sincronisent automatiquement quand vous
+              importez des leads ou que d'autres utilisateurs effectuent des modifications.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Scoring des leads</CardTitle>
@@ -160,6 +186,5 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>);
 }

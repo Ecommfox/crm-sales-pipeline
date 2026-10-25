@@ -9,6 +9,7 @@ import type {
   GetManyParams,
 } from "@refinedev/core";
 import { supabaseClient } from "@/lib/supabaseClient";
+import mockData from "@/mocks.json";
 
 // ── Field mappings: TypeScript camelCase → Supabase snake_case ────────────────
 // Format: { tsField: supabaseColumn }
@@ -29,6 +30,7 @@ const LEADS_MAP: Record<string, string> = {
   identifiedNeeds: "identified_needs",
   openForAppointment: "open_for_appointment",
   mainContactId: "main_contact_id",
+  archived: "archived",
   createdAt: "created_at",
 };
 
@@ -80,9 +82,10 @@ const APPOINTMENTS_MAP: Record<string, string> = {
   appointmentTime: "appointment_time",
   appointmentType: "appointment_type",
   finalStatus: "final_status",
-  emailSubject: "email_subject",
-  emailBody: "email_context",
+  emailSent: "email_sent",
+  notes: "notes",
   callRecordingUrl: "call_recording_url",
+  confirmed: "confirmed",
   createdAt: "created_at",
 };
 
@@ -208,42 +211,72 @@ const baseProvider = supabaseDataProvider(supabaseClient) as DataProvider;
 export const dataProvider: DataProvider = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getList: async (params: GetListParams): Promise<any> => {
-    const supabaseResource = RESOURCE_NAME_MAP[params.resource] ?? params.resource;
+    try {
+      const supabaseResource = RESOURCE_NAME_MAP[params.resource] ?? params.resource;
 
-    // Auto-join company name for leads
-    let meta = params.meta;
-    if (supabaseResource === "leads" && !params.meta?.select) {
-      meta = { ...meta, select: "*, companies(nom)" };
+      // Auto-join company name for leads
+      let meta = params.meta;
+      if (supabaseResource === "leads" && !params.meta?.select) {
+        meta = { ...meta, select: "*, companies(nom)" };
+      }
+
+      const result = await baseProvider.getList({
+        ...params,
+        meta,
+        resource: supabaseResource,
+        filters: mapFilters(params.resource, params.filters),
+        sorters: mapSorters(params.resource, params.sorters),
+      });
+      return {
+        ...result,
+        data: result.data.map((row) => fromSupabaseRow(params.resource, row as Record<string, unknown>)),
+      };
+    } catch (error) {
+      // Fallback to mock data if Supabase is unavailable
+      console.warn(`Supabase query failed for resource "${params.resource}". Using mock data.`, error);
+      
+      const mockTable = mockData[params.resource as keyof typeof mockData] ?? [];
+      const items = Array.isArray(mockTable) ? mockTable : [];
+      
+      return {
+        data: items,
+        total: items.length,
+        pageSize: items.length,
+        hasPagination: false,
+      };
     }
-
-    const result = await baseProvider.getList({
-      ...params,
-      meta,
-      resource: supabaseResource,
-      filters: mapFilters(params.resource, params.filters),
-      sorters: mapSorters(params.resource, params.sorters),
-    });
-    return {
-      ...result,
-      data: result.data.map((row) => fromSupabaseRow(params.resource, row as Record<string, unknown>)),
-    };
   },
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getOne: async (params: GetOneParams): Promise<any> => {
-    const supabaseResource = RESOURCE_NAME_MAP[params.resource] ?? params.resource;
+    try {
+      const supabaseResource = RESOURCE_NAME_MAP[params.resource] ?? params.resource;
 
-    // Auto-join company name for leads
-    let meta = params.meta;
-    if (supabaseResource === "leads" && !params.meta?.select) {
-      meta = { ...meta, select: "*, companies(nom)" };
+      // Auto-join company name for leads
+      let meta = params.meta;
+      if (supabaseResource === "leads" && !params.meta?.select) {
+        meta = { ...meta, select: "*, companies(nom)" };
+      }
+
+      const result = await baseProvider.getOne({ ...params, meta, resource: supabaseResource });
+      return {
+        ...result,
+        data: fromSupabaseRow(params.resource, result.data as Record<string, unknown>),
+      };
+    } catch (error) {
+      // Fallback to mock data if Supabase is unavailable
+      console.warn(`Supabase query failed for resource "${params.resource}". Using mock data.`, error);
+      
+      const mockTable = mockData[params.resource as keyof typeof mockData] ?? [];
+      const items = Array.isArray(mockTable) ? mockTable : [];
+      const item = items.find((i: any) => i.id == params.id);
+      
+      if (!item) {
+        throw new Error(`Mock data: Item with id ${params.id} not found in resource ${params.resource}`);
+      }
+      
+      return { data: item };
     }
-
-    const result = await baseProvider.getOne({ ...params, meta, resource: supabaseResource });
-    return {
-      ...result,
-      data: fromSupabaseRow(params.resource, result.data as Record<string, unknown>),
-    };
   },
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

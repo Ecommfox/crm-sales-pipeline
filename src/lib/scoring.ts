@@ -1,4 +1,5 @@
 import { getScoringSettings } from "./scoring-settings";
+import { supabaseClient } from "./supabaseClient";
 
 export interface QualificationData {
   interestLevel: string;
@@ -49,6 +50,107 @@ export function calculateScore(qual: QualificationData, callCount: number): numb
   if (qual.openForAppointment === true) score += s.openForAppointmentPoints;
   score += Math.min(callCount * s.callPerLog, s.callMax);
   return score;
+}
+
+/**
+ * Save lead qualification data to Supabase
+ */
+export async function saveQualificationToSupabase(
+  leadId: number,
+  qual: QualificationData
+): Promise<void> {
+  try {
+    // Calculate score based on qualification
+    const { data: callLogs } = await supabaseClient
+      .from("call_logs")
+      .select("id", { count: "exact" })
+      .eq("lead_id", leadId);
+
+    const callCount = callLogs?.length ?? 0;
+    const score = calculateScore(qual, callCount);
+
+    // Update lead in Supabase
+    const { error } = await supabaseClient
+      .from("leads")
+      .update({
+        interest_level: qual.interestLevel || null,
+        pain_points: qual.painPoints && qual.painPoints.length > 0 ? qual.painPoints : null,
+        identified_needs: qual.identifiedNeeds || null,
+        open_for_appointment: qual.openForAppointment,
+        main_contact_id: qual.mainContactId || null,
+        score: score,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", leadId);
+
+    if (error) throw error;
+
+    // Also save to localStorage for offline access
+    const map = getQualificationMap();
+    map[leadId] = qual;
+    saveQualificationMap(map);
+  } catch (error) {
+    console.error("Failed to save qualification to Supabase:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update lead score in Supabase (called after call logs are saved)
+ */
+export async function updateLeadScore(leadId: number): Promise<number> {
+  try {
+    // Get the lead with all qualification data
+    const { data: leadData, error: leadError } = await supabaseClient
+      .from("leads")
+      .select("*")
+      .eq("id", leadId)
+      .single();
+
+    if (leadError) throw leadError;
+
+    if (!leadData) {
+      console.warn(`Lead ${leadId} not found`);
+      return 0;
+    }
+
+    // Get call logs for this lead
+    const { data: callLogs, error: callError } = await supabaseClient
+      .from("call_logs")
+      .select("id", { count: "exact" })
+      .eq("lead_id", leadId);
+
+    if (callError) throw callError;
+
+    // Build qualification from lead data
+    const qual: QualificationData = {
+      interestLevel: leadData.interest_level || "",
+      painPoints: leadData.pain_points || [],
+      identifiedNeeds: leadData.identified_needs || "",
+      openForAppointment: leadData.open_for_appointment,
+      mainContactId: leadData.main_contact_id?.toString() || "",
+    };
+
+    // Calculate new score
+    const callCount = callLogs?.length ?? 0;
+    const newScore = calculateScore(qual, callCount);
+
+    // Update score in Supabase
+    const { error: updateError } = await supabaseClient
+      .from("leads")
+      .update({
+        score: newScore,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", leadId);
+
+    if (updateError) throw updateError;
+
+    return newScore;
+  } catch (error) {
+    console.error("Failed to update lead score:", error);
+    throw error;
+  }
 }
 
 export function getScoreStyle(score: number): { className: string; ring: string } {

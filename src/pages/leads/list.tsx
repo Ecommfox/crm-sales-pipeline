@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { useTable } from "@refinedev/react-table";
 import type { ColumnDef, VisibilityState } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
-import { PhoneCall, SlidersHorizontal, ChevronDown, X, Filter, ChevronUp, ListFilter } from "lucide-react";
+import { PhoneCall, SlidersHorizontal, ChevronDown, X, Filter, ChevronUp, ListFilter, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
 import { LogCallModal } from "@/components/log-call-modal";
+import { useRealtime } from "@/hooks/use-realtime";
 import type { Lead, Stage, CallResult } from "@/types";
 
 // ── Stage badge config ────────────────────────────────────────────────────────
@@ -70,6 +71,8 @@ const CALL_RESULT_COLORS: Record<CallResult, string> = {
   "Non appelé": "bg-slate-100 text-slate-600 border-slate-200",
   "Numéro non attribué": "bg-red-100 text-red-600 border-red-200",
   "Liste noire": "bg-red-900/20 text-red-800 border-red-300",
+  Positif: "bg-green-100 text-green-700 border-green-200",
+  Negatif: "bg-red-100 text-red-700 border-red-200",
 };
 
 function CallResultBadge({ result }: { result: CallResult | null }) {
@@ -93,7 +96,76 @@ function formatDate(iso: string | null) {
     minute: "2-digit",
   });
 }
+// ── CSV Export function ───────────────────────────────────────────────────────
+function exportToCSV(leads: Lead[], filename: string = "leads.csv") {
+  const headers = [
+    "ID",
+    "Statut",
+    "Société",
+    "SIRET",
+    "Activité",
+    "Civilité",
+    "Nom",
+    "Prénom",
+    "Fonction",
+    "Adresse",
+    "Code Postal",
+    "Ville",
+    "Téléphone Fixe",
+    "Téléphone Portable",
+    "Email",
+    "Date/Heure Appel",
+    "État Appel",
+    "Commentaire",
+    "Numéro Unique",
+    "Téléopérateur",
+  ];
 
+  const rows = leads.map((lead) => [
+    lead.id,
+    lead.stage,
+    lead.societe,
+    lead.siret,
+    lead.activite,
+    lead.civilite,
+    lead.nom,
+    lead.prenom,
+    lead.fonction,
+    lead.adresse,
+    lead.codePostal,
+    lead.ville,
+    lead.telephoneFixe,
+    lead.telephonePortable,
+    lead.mail,
+    formatDate(lead.dateHeureAppel),
+    lead.etatAppel || "",
+    lead.commentaireTeleoperateur || "",
+    lead.numeroUnique,
+    lead.teleoperateurAppel || "",
+  ]);
+
+  // Escape CSV values
+  const escapedRows = rows.map((row) =>
+    row.map((cell) => {
+      const str = String(cell || "");
+      return str.includes(",") || str.includes('"') || str.includes("\n")
+        ? `"${str.replace(/"/g, '""')}"`
+        : str;
+    })
+  );
+
+  const csv = [headers.join(","), ...escapedRows.map((row) => row.join(","))].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 // ── Column meta label map ─────────────────────────────────────────────────────
 const COLUMN_LABELS: Record<string, string> = {
   stage: "Statut",
@@ -333,8 +405,23 @@ export default function LeadsListPage() {
   });
 
   const { getHeaderGroups, getRowModel, getAllColumns } = table.reactTable;
+  const tableQuery = (table as any)?.query;
 
   const rawRows = getRowModel().rows;
+
+  // Set up real-time subscriptions for auto-refresh
+  // Call at top level (not inside useEffect) per React's Rules of Hooks
+  useRealtime({
+    table: "leads",
+    onInsert: () => {
+      console.log("[Leads] New lead inserted - refetching...");
+      tableQuery?.refetch?.();
+    },
+    onUpdate: () => {
+      console.log("[Leads] Lead updated - refetching...");
+      tableQuery?.refetch?.();
+    },
+  });
 
   // Derive unique Ville and Activité options from raw data
   const villeOptions = useMemo(() => {
@@ -351,6 +438,9 @@ export default function LeadsListPage() {
   const filteredRows = useMemo(() => {
     return rawRows.filter((row) => {
       const lead = row.original;
+
+      // Filter out archived leads by default
+      if (lead.archived) return false;
 
       if (stageFilter !== "all" && lead.stage !== stageFilter) return false;
       if (etatFilter !== "all" && lead.etatAppel !== etatFilter) return false;
@@ -452,6 +542,19 @@ export default function LeadsListPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Download CSV button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => {
+              const timestamp = new Date().toISOString().split("T")[0];
+              exportToCSV(filteredRows.map((r) => r.original), `leads_${timestamp}.csv`);
+            }}>
+            <Download className="h-4 w-4" />
+            Télécharger
+          </Button>
+
           {/* Column visibility toggle */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -282,10 +282,10 @@ export default function CompaniesPage() {
   }, [companies, activiteFilter, villeFilter, searchQuery]);
 
   // Count helpers
-  function countContacts(companyId: number) {
+  function countContacts(companyId: string) {
     return contacts.filter((c: Contact) => c.companyId === companyId).length;
   }
-  function countLeads(companyId: number) {
+  function countLeads(companyId: string) {
     return leads.filter((l: Lead) => l.companyId === companyId).length;
   }
 

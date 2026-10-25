@@ -79,6 +79,8 @@ const CALL_RESULT_COLORS: Record<CallResult, string> = {
   "Non appelé": "bg-slate-100 text-slate-600 border-slate-200",
   "Numéro non attribué": "bg-red-100 text-red-600 border-red-200",
   "Liste noire": "bg-red-900/20 text-red-800 border-red-300",
+  Positif: "bg-green-100 text-green-700 border-green-200",
+  Negatif: "bg-red-100 text-red-700 border-red-200",
 };
 
 const CALL_TYPE_COLORS: Record<string, string> = {
@@ -179,7 +181,7 @@ const emptyContact: ContactFormData = {
 interface ContactFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  companyId: number;
+  companyId: string;
   initialData?: Contact | null;
   onSuccess: () => void;
 }

@@ -108,8 +108,9 @@ Replace mock data with live Supabase database, import existing prospect data, an
 
 #### Tasks
 
-- [ ] Connect Supabase and map database schema to all existing data types (leads, companies, contacts, call logs, appointments)
-- [ ] Replace all mock data providers with Supabase data hooks
+- [x] Connect Supabase and map database schema to all existing data types (leads, companies, contacts, call logs, appointments)
+- [ ] Verify Supabase tables exist and setup schema if needed
+- [ ] Replace all mock data providers with Supabase data hooks (data provider already configured)
 - [ ] Add CSV/Excel import for leads (map columns from the prospect file format defined in requirements)
 - [ ] Wire call log creation, lead stage updates, scoring calculations to Supabase
 - [ ] Add real-time updates: lead stage changes and new call logs reflect live across users

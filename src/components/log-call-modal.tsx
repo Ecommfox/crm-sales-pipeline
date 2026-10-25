@@ -28,6 +28,8 @@ const CALL_RESULTS: CallResult[] = [
   "Non appelé",
   "Numéro non attribué",
   "Liste noire",
+  "Positif",
+  "Negatif",
 ];
 
 const CALL_TYPES: CallType[] = ["Normal", "Qualification", "Rappel", "Rendez-vous", "Relance", "Closing"];

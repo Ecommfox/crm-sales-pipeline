@@ -995,7 +995,9 @@
       "emailBody": "Bonjour Mme Roux,\n\nSuite à notre échange téléphonique, je vous confirme notre rendez-vous en visioconférence le 30 janvier à 14h.\n\nNous vous présenterons notre solution de gestion pharmacie conforme RGPD avec gestion des stocks et ordonnances numériques.\n\nCordialement,\nJulie Petit",
       "notes": "Isabelle Roux est très intéressée par la conformité RGPD. Préparer démonstration module stocks.",
       "callRecordingUrl": null,
-      "createdAt": "2024-01-21T09:30:00"
+      "createdAt": "2024-01-21T09:30:00",
+      "confirmed": true,
+      "finalStatus": "Confirmé"
     },
     {
       "id": 2,
@@ -1009,7 +1011,9 @@
       "emailBody": "Bonjour M. Mercier,\n\nJe vous confirme notre rendez-vous présentiel le 5 février à 10h30 dans vos locaux de Nice.\n\nNous aborderons l'audit de votre infrastructure actuelle et les options de migration cloud sécurisée.\n\nCordialement,\nMarc Lefebvre",
       "notes": "Client prioritaire. Prévoir audit complet + proposition tarifée. Laura Fontaine (CTO) sera également présente.",
       "callRecordingUrl": "https://recordings.example.com/call-15-closing.mp3",
-      "createdAt": "2024-01-28T13:30:00"
+      "createdAt": "2024-01-28T13:30:00",
+      "confirmed": false,
+      "finalStatus": "Planifié"
     },
     {
       "id": 3,
@@ -1023,7 +1027,9 @@
       "emailBody": "Bonjour Mme Martin,\n\nSuite à notre échange, je vous confirme notre rendez-vous visio le 8 février à 11h.\n\nNous vous présenterons notre plateforme RH complète : recrutement, onboarding et suivi des performances.\n\nCordialement,\nJulie Petit",
       "notes": "Anne Martin veut impliquer Éric Legrand (responsable recrutement) dans la réunion. Prévoir démo module recrutement en priorité.",
       "callRecordingUrl": null,
-      "createdAt": "2024-01-18T12:00:00"
+      "createdAt": "2024-01-18T12:00:00",
+      "confirmed": true,
+      "finalStatus": "Confirmé"
     },
     {
       "id": 4,
@@ -1037,7 +1043,9 @@
       "emailBody": "Bonjour M. Simon,\n\nJe vous confirme notre appel de démonstration le 12 février à 9h.\n\nNous vous présenterons notre solution complète de gestion auto-école : planification moniteurs, suivi élèves et facturation intégrée.\n\nCordialement,\nMarc Lefebvre",
       "notes": "Nicolas Simon veut une solution opérationnelle avant l'été. Budget confirmé. Démo interactive souhaitée.",
       "callRecordingUrl": null,
-      "createdAt": "2024-01-22T11:00:00"
+      "createdAt": "2024-01-22T11:00:00",
+      "confirmed": false,
+      "finalStatus": "Perdu"
     }
   ]
 }

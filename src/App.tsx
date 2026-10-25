@@ -10,6 +10,7 @@ import {
   Users,
   Settings,
   BarChart2,
+  FileUp,
 } from "lucide-react";
 
 import { dataProvider } from "@/providers/data";
@@ -18,6 +19,11 @@ import { useNotificationProvider } from "@/components/refine-ui/notification/use
 import { Toaster } from "@/components/refine-ui/notification/toaster";
 import { ThemeProvider } from "@/components/refine-ui/theme/theme-provider";
 import { Layout } from "@/components/refine-ui/layout/layout";
+import { ProtectedRoute } from "@/components/protected-route";
+
+import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
+import InvitePage from "@/pages/invite";
 
 import LeadsListPage from "@/pages/leads/list";
 import LeadShowPage from "@/pages/leads/show";
@@ -30,6 +36,11 @@ import CompanyShowPage from "@/pages/companies/show";
 import ContactsPage from "@/pages/contacts/index";
 import SettingsPage from "@/pages/settings/index";
 import AnalyticsPage from "@/pages/analytics/index";
+import ImportPage from "@/pages/import/index";
+import UserManagementPage from "@/pages/admin/user-management";
+import AdminDashboardPage from "@/pages/admin/index";
+import AuditLogsPage from "@/pages/admin/audit-logs";
+import AdminSettingsPage from "@/pages/admin/settings";
 import { RefineAiErrorComponent } from "@/components/catch-all";
 
 function App() {
@@ -110,6 +121,14 @@ function App() {
               },
             },
             {
+              name: "import",
+              list: "/import",
+              meta: {
+                label: "Importer des Leads",
+                icon: <FileUp className="h-4 w-4" />,
+              },
+            },
+            {
               name: "settings",
               list: "/settings",
               meta: {
@@ -127,11 +146,19 @@ function App() {
             },
           }}>
           <Routes>
+            {/* Public Auth Routes */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/invite/:token" element={<InvitePage />} />
+
+            {/* Protected Routes */}
             <Route
               element={
-                <Layout>
-                  <Outlet />
-                </Layout>
+                <ProtectedRoute>
+                  <Layout>
+                    <Outlet />
+                  </Layout>
+                </ProtectedRoute>
               }>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -144,7 +171,12 @@ function App() {
               <Route path="/companies/:id" element={<CompanyShowPage />} />
               <Route path="/contacts" element={<ContactsPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/import" element={<ImportPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/admin" element={<AdminDashboardPage />} />
+              <Route path="/admin/users" element={<UserManagementPage />} />
+              <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
+              <Route path="/admin/settings" element={<AdminSettingsPage />} />
               <Route path="*" element={<RefineAiErrorComponent />} />
             </Route>
           </Routes>

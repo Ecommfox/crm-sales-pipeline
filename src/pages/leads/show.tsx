@@ -15,6 +15,7 @@ import {
   Mail,
   Hash,
   MessageSquare,
+  Archive,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -27,9 +28,10 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { LogCallModal } from "@/components/log-call-modal";
+import { ScheduleAppointmentModal } from "@/components/schedule-appointment-modal";
 import { ScoreBadge } from "@/components/score-badge";
 import { dataProvider } from "@/providers/data";
-import type { Lead, CallLog, Stage, CallResult } from "@/types";
+import type { Lead, CallLog, Stage, CallResult, Contact } from "@/types";
 import { getQualificationMap, getQualData, calculateScore } from "@/lib/scoring";
 
 // ── Stage configuration ───────────────────────────────────────────────────────
@@ -86,6 +88,8 @@ const CALL_RESULT_COLORS: Record<CallResult, string> = {
   "Non appelé": "bg-slate-100 text-slate-600 border-slate-200",
   "Numéro non attribué": "bg-red-100 text-red-600 border-red-200",
   "Liste noire": "bg-red-900/20 text-red-800 border-red-300",
+  Positif: "bg-green-100 text-green-700 border-green-200",
+  Negatif: "bg-red-100 text-red-700 border-red-200",
 };
 
 const CALL_TYPE_COLORS: Record<string, string> = {
@@ -334,6 +338,15 @@ export default function LeadShowPage() {
   });
   const callLogs = (callLogsQuery.data?.data ?? []).filter((log: CallLog) => String(log.leadId) === String(id));
 
+  // Contacts for this lead
+  const { query: contactsQuery } = useList<Contact>({
+    resource: "contacts",
+    pagination: { pageSize: 1000 },
+  });
+  const allContacts = (contactsQuery.data?.data ?? []).filter(
+    (contact: Contact) => String(contact.companyId) === String(lead?.companyId)
+  );
+
   // Score calculation
   const qualMap = getQualificationMap();
   const qualData = lead ? getQualData(lead.id, qualMap) : null;
@@ -344,8 +357,14 @@ export default function LeadShowPage() {
   const [editForm, setEditForm] = useState<Partial<Lead>>({});
   const [isSaving, setIsSaving] = useState(false);
 
+  // Archive state
+  const [isArchiving, setIsArchiving] = useState(false);
+
   // Log call modal
   const [logCallOpen, setLogCallOpen] = useState(false);
+
+  // Schedule appointment modal
+  const [scheduleAppointmentOpen, setScheduleAppointmentOpen] = useState(false);
 
   // Sync editForm when lead loads
   useEffect(() => {
@@ -385,6 +404,28 @@ export default function LeadShowPage() {
   function handleCallLogged() {
     query.refetch();
     callLogsQuery.refetch();
+  }
+
+  function handleAppointmentScheduled() {
+    query.refetch();
+    setScheduleAppointmentOpen(false);
+  }
+
+  async function handleArchive() {
+    if (!lead) return;
+    setIsArchiving(true);
+    try {
+      await dataProvider.update({
+        resource: "leads",
+        id: lead.id,
+        variables: { archived: true },
+      });
+      navigate("/leads");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsArchiving(false);
+    }
   }
 
   function ef(field: keyof Lead) {
@@ -482,9 +523,23 @@ export default function LeadShowPage() {
                   <Pencil className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Modifier</span>
                 </Button>
-                <Button variant="outline" size="sm" className="gap-1.5 text-muted-foreground" disabled>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={lead.stage !== "qualified" && lead.stage !== "pre-scheduled" && lead.stage !== "confirmed"}
+                  onClick={() => setScheduleAppointmentOpen(true)}>
                   <CalendarClock className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Planifier RDV</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  disabled={isArchiving}
+                  onClick={handleArchive}>
+                  <Archive className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{isArchiving ? "Archivage…" : "Archiver"}</span>
                 </Button>
               </>
             )}
@@ -699,6 +754,15 @@ export default function LeadShowPage() {
         <div className="space-y-4">
           <StageTracker current={lead.stage} />
           <CallTimeline logs={callLogs} />
+
+      {/* Schedule Appointment Modal */}
+      <ScheduleAppointmentModal
+        lead={lead}
+        open={scheduleAppointmentOpen}
+        onOpenChange={setScheduleAppointmentOpen}
+        onSuccess={handleAppointmentScheduled}
+        contacts={allContacts}
+      />
         </div>
       </div>
 

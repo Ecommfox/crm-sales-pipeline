@@ -192,7 +192,7 @@ export interface ContactFormModalProps {
   /** If provided, form is in edit mode pre-filled with this data */
   initialData?: Contact | null;
   /** Pre-set company ID (e.g., when adding contact from company detail page) */
-  defaultCompanyId?: number;
+  defaultCompanyId?: string;
   /** List of companies for the company selector */
   companies: Company[];
   /** List of leads for the lead selector (optional) */
@@ -281,7 +281,7 @@ export function ContactFormModal({
       fonction: form.fonction.trim(),
       mail: form.mail.trim(),
       telephonePortable: form.telephonePortable.trim(),
-      companyId: form.companyId ? Number(form.companyId) : null,
+      companyId: form.companyId || null,
     };
 
     const contactLabel = `${form.prenom} ${form.nom}`;

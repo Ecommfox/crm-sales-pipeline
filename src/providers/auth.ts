@@ -1,30 +1,79 @@
 import type { AuthProvider } from "@refinedev/core";
+import { supabaseClient } from "@/lib/supabaseClient";
 
 export const authProvider: AuthProvider = {
-  login: async () => {
-    throw new Error("Not implemented");
+  login: async ({ email, password }) => {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) throw error;
+    return { success: true };
   },
-  register: async () => {
-    throw new Error("Not implemented");
+
+  register: async ({ email, password }) => {
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) throw error;
+
+    // Create user profile entry
+    if (data.user) {
+      const { error: profileError } = await supabaseClient
+        .from("user_profiles")
+        .insert({
+          id: data.user.id,
+          email: email,
+          full_name: email.split("@")[0],
+          role: "teleoperator",
+          is_active: true,
+        });
+
+      if (profileError) {
+        console.error("Error creating user profile:", profileError);
+        // Don't throw - user is already created, profile will be created manually
+      }
+    }
+
+    return { success: true };
   },
+
   check: async () => {
-    return {
-      authenticated: true,
-    };
+    const { data } = await supabaseClient.auth.getSession();
+    return { authenticated: !!data.session };
   },
+
   getIdentity: async () => {
+    const { data } = await supabaseClient.auth.getUser();
+    if (!data.user) return null;
+
     return {
-      id: 0,
-      email: "user@example.com",
+      id: data.user.id,
+      email: data.user.email,
+      name: data.user.email?.split("@")[0] || "User",
     };
   },
+
   getPermissions: async () => {
-    throw new Error("Not implemented");
+    // Placeholder for future role-based permissions
+    return null;
   },
+
   logout: async () => {
-    throw new Error("Not implemented");
+    try {
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) throw error;
+      return { success: true, redirect: "/login" };
+    } catch (err: any) {
+      console.error("Logout error:", err);
+      return { success: false, redirect: "/login" };
+    }
   },
-  onError: async () => {
-    throw new Error("Not implemented");
+
+  onError: async (error) => {
+    console.error("Auth error:", error);
   },
 };

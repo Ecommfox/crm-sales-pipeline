@@ -74,6 +74,8 @@ const CALL_RESULT_COLORS: Record<string, string> = {
   "Non appelé": "bg-slate-100 text-slate-700",
   "Numéro non attribué": "bg-red-200 text-red-800",
   "Liste noire": "bg-black text-white",
+  Positif: "bg-green-100 text-green-700",
+  Negatif: "bg-red-100 text-red-700",
 };
 
 const INTEREST_COLORS: Record<InterestLevel, string> = {

@@ -63,6 +63,8 @@ export function ScheduleAppointmentModal({
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [showEmailConfirm, setShowEmailConfirm] = useState(false);
+  const [emailSent, setEmailSent] = useState<boolean | null>(null);
 
   // ── Derived ─────────────────────────────────────────────────────────────────
   const linkedContacts = lead ? contacts.filter((c) => c.companyId === lead.companyId) : [];
@@ -80,6 +82,8 @@ export function ScheduleAppointmentModal({
       setRecordingMode("url");
       setRecordingUrl("");
       setErrors({});
+      setShowEmailConfirm(false);
+      setEmailSent(null);
     }
   }, [lead, open, mainContactId]);
 
@@ -95,14 +99,27 @@ export function ScheduleAppointmentModal({
   // ── Submit ───────────────────────────────────────────────────────────────────
   async function handleSubmit() {
     if (!lead || !validate()) return;
+    // Show email confirmation dialog
+    setShowEmailConfirm(true);
+  }
+
+  async function handleEmailConfirm(sendEmail: boolean) {
+    if (!lead) return;
+    setEmailSent(sendEmail);
     setIsLoading(true);
 
     try {
-      // Build ISO datetime from date + time
+      // Convert date to YYYY-MM-DD format for Supabase DATE column
+      const dateObj = new Date(appointmentDate!);
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+      const day = String(dateObj.getDate()).padStart(2, "0");
+      const formattedDate = `${year}-${month}-${day}`;
+
+      // Build datetime for display
+      const displayDate = new Date(dateObj);
       const [hours, minutes] = appointmentTime.split(":").map(Number);
-      const dt = new Date(appointmentDate!);
-      dt.setHours(hours, minutes, 0, 0);
-      const isoDate = dt.toISOString();
+      displayDate.setHours(hours, minutes, 0, 0);
 
       // 1. Save appointment record
       await dataProvider.create({
@@ -110,13 +127,14 @@ export function ScheduleAppointmentModal({
         variables: {
           leadId: lead.id,
           companyId: lead.companyId ?? null,
-          contactId: contactId ? Number(contactId) : null,
-          appointmentDate: isoDate,
+          contactId: contactId && contactId !== "_none" ? contactId : null,
+          appointmentDate: formattedDate,
+          appointmentTime: appointmentTime,
           appointmentType: appointmentType as AppointmentType,
-          emailSubject: emailSubject.trim(),
-          emailBody: emailBody.trim(),
           notes: notes.trim(),
           callRecordingUrl: recordingMode === "url" && recordingUrl.trim() ? recordingUrl.trim() : null,
+          emailSent: sendEmail,
+          confirmed: false,
           createdAt: new Date().toISOString(),
         },
       });
@@ -128,11 +146,40 @@ export function ScheduleAppointmentModal({
         variables: { stage: "pre-scheduled" },
       });
 
+      /* Send email if user chose yes */
+      if (sendEmail && contactId && contactId !== "_none") {
+        const selectedContact = linkedContacts.find((c) => String(c.id) === contactId);
+        if (selectedContact && selectedContact.mail) {
+          try {
+            // Call email API (replace with your actual email service endpoint)
+            const emailResponse = await fetch("/api/send-email", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to: selectedContact.mail,
+                subject: emailSubject.trim() || `Rendez-vous confirmé - ${lead.societe}`,
+                body: emailBody.trim() || `Rendez-vous ${appointmentType} confirmé pour le ${format(displayDate, "d MMMM yyyy 'à' HH:mm", { locale: fr })}`,
+                contactName: `${selectedContact.civilite} ${selectedContact.nom}`,
+                appointmentType,
+                appointmentDate: format(displayDate, "d MMMM yyyy 'à' HH:mm", { locale: fr }),
+              }),
+            });
+
+            if (!emailResponse.ok) {
+              console.warn("[ScheduleAppointmentModal] Email notification failed but appointment was created");
+            }
+          } catch (emailErr) {
+            console.warn("[ScheduleAppointmentModal] Email send error:", emailErr);
+            // Don't fail the whole operation if email fails
+          }
+        }
+      }
+
       // 3. Toast
       notify?.({
         type: "success",
         message: "Rendez-vous planifié",
-        description: `RDV ${appointmentType} le ${format(dt, "d MMMM yyyy 'à' HH:mm", { locale: fr })} — ${lead.prenom} ${lead.nom}`,
+        description: `RDV ${appointmentType} le ${format(displayDate, "d MMMM yyyy 'à' HH:mm", { locale: fr })} — ${lead.prenom} ${lead.nom}${sendEmail ? " — Email de confirmation envoyé" : ""}`,
       });
 
       onSuccess();
@@ -146,6 +193,7 @@ export function ScheduleAppointmentModal({
       });
     } finally {
       setIsLoading(false);
+      setShowEmailConfirm(false);
     }
   }
 
@@ -298,14 +346,14 @@ export function ScheduleAppointmentModal({
 
             {/* ── Email section ───────────────────────────────────────────── */}
             <div className="space-y-3 rounded-lg border p-4 bg-muted/20">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contexte email</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email de confirmation</p>
               <div className="space-y-1.5">
                 <Label htmlFor="emailSubject">Objet</Label>
                 <Input
                   id="emailSubject"
                   value={emailSubject}
                   onChange={(e) => setEmailSubject(e.target.value)}
-                  placeholder="Ex: Proposition commerciale — Réunion du 28 juin"
+                  placeholder="Ex: Rendez-vous confirmé - Proposition commerciale"
                 />
               </div>
               <div className="space-y-1.5">
@@ -382,6 +430,49 @@ export function ScheduleAppointmentModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* ── Email Confirmation Dialog ─────────────────────────────────────── */}
+      <Dialog open={showEmailConfirm} onOpenChange={setShowEmailConfirm}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Confirmer l'envoi d'email</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Destinataire</p>
+              <p className="text-sm font-medium">
+                {linkedContacts.find((c) => String(c.id) === contactId)?.nom || "contact"} ({linkedContacts.find((c) => String(c.id) === contactId)?.mail})
+              </p>
+            </div>
+
+            <div className="rounded-lg border p-3 bg-muted/30">
+              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase">Sujet</p>
+              <p className="text-sm font-medium text-foreground">{emailSubject || "Non spécifié"}</p>
+            </div>
+
+            <div className="rounded-lg border p-3 bg-muted/30">
+              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase">Aperçu du message</p>
+              <p className="text-sm text-foreground whitespace-pre-wrap max-h-32 overflow-y-auto">
+                {emailBody || "Pas de message"}
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => handleEmailConfirm(false)}
+              disabled={isLoading}>
+              Non, ne pas envoyer
+            </Button>
+            <Button
+              onClick={() => handleEmailConfirm(true)}
+              disabled={isLoading}
+              className="gap-2">
+              {isLoading ? "Enregistrement…" : "Oui, envoyer l'email"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
