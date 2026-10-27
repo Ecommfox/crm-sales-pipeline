@@ -12,31 +12,21 @@ export const authProvider: AuthProvider = {
     return { success: true };
   },
 
-  register: async ({ email, password }) => {
+  register: async ({ email, password, firstName, surname }) => {
     const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          full_name: [firstName, surname]
+            .filter((name): name is string => typeof name === "string" && name.trim().length > 0)
+            .map((name) => name.trim())
+            .join(" ") || email.split("@")[0],
+        },
+      },
     });
 
     if (error) throw error;
-
-    // Create user profile entry
-    if (data.user) {
-      const { error: profileError } = await supabaseClient
-        .from("user_profiles")
-        .insert({
-          id: data.user.id,
-          email: email,
-          full_name: email.split("@")[0],
-          role: "teleoperator",
-          is_active: true,
-        });
-
-      if (profileError) {
-        console.error("Error creating user profile:", profileError);
-        // Don't throw - user is already created, profile will be created manually
-      }
-    }
 
     return { success: true };
   },
@@ -50,16 +40,34 @@ export const authProvider: AuthProvider = {
     const { data } = await supabaseClient.auth.getUser();
     if (!data.user) return null;
 
+    const { data: profile, error } = await supabaseClient
+      .from("user_profiles")
+      .select("full_name")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    if (error) throw error;
+
     return {
       id: data.user.id,
       email: data.user.email,
-      name: data.user.email?.split("@")[0] || "User",
+      name: profile?.full_name || data.user.email?.split("@")[0] || "User",
     };
   },
 
   getPermissions: async () => {
-    // Placeholder for future role-based permissions
-    return null;
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+    if (userError) throw userError;
+    if (!userData.user) return null;
+
+    const { data: profile, error: profileError } = await supabaseClient
+      .from("user_profiles")
+      .select("role")
+      .eq("id", userData.user.id)
+      .maybeSingle();
+
+    if (profileError) throw profileError;
+    return profile?.role ?? null;
   },
 
   logout: async () => {
@@ -75,5 +83,6 @@ export const authProvider: AuthProvider = {
 
   onError: async (error) => {
     console.error("Auth error:", error);
+    return { error };
   },
 };

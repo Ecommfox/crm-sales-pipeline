@@ -61,58 +61,22 @@ export async function createInvitation(
 export async function getInvitationByToken(
   token: string
 ): Promise<PendingInvitation | null> {
-  try {
-    const { data, error } = await supabaseClient
-      .from("pending_invitations")
-      .select("*")
-      .eq("token", token)
-      .eq("status", "pending")
-      .single();
-
-    if (error) {
-      if (error.code === "PGRST116") {
-        return null; // No matching invitation found
-      }
-      throw error;
-    }
-
-    // Check if invitation is expired
-    if (data && new Date(data.expires_at) < new Date()) {
-      // Mark as expired
-      await supabaseClient
-        .from("pending_invitations")
-        .update({ status: "expired" })
-        .eq("id", data.id);
-      return null;
-    }
-
-    return data || null;
-  } catch (err: any) {
-    console.error("Error fetching invitation:", err);
-    return null;
-  }
+  const { data, error } = await supabaseClient.rpc("get_pending_invitation_by_token", {
+    p_token: token,
+  });
+  if (error) throw error;
+  return (data?.[0] as PendingInvitation | undefined) ?? null;
 }
 
 /**
  * Mark invitation as accepted
  */
 export async function acceptInvitation(token: string): Promise<boolean> {
-  try {
-    const { error } = await supabaseClient
-      .from("pending_invitations")
-      .update({
-        status: "accepted",
-        accepted_at: new Date().toISOString(),
-      })
-      .eq("token", token);
-
-    if (error) throw error;
-
-    return true;
-  } catch (err: any) {
-    console.error("Error accepting invitation:", err);
-    return false;
-  }
+  const { error } = await supabaseClient.rpc("complete_pending_invitation", {
+    p_token: token,
+  });
+  if (error) throw error;
+  return true;
 }
 
 /**

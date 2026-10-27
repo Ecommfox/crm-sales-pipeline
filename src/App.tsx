@@ -37,11 +37,15 @@ import ContactsPage from "@/pages/contacts/index";
 import SettingsPage from "@/pages/settings/index";
 import AnalyticsPage from "@/pages/analytics/index";
 import ImportPage from "@/pages/import/index";
+import ResetPasswordPage from "@/pages/reset-password";
+import ProfilePage from "@/pages/profile";
 import UserManagementPage from "@/pages/admin/user-management";
 import AdminDashboardPage from "@/pages/admin/index";
 import AuditLogsPage from "@/pages/admin/audit-logs";
 import AdminSettingsPage from "@/pages/admin/settings";
 import { RefineAiErrorComponent } from "@/components/catch-all";
+import { SettingsAccessGuard } from "@/components/settings-access-guard";
+import { supabaseClient } from "@/lib/supabaseClient";
 
 function App() {
   const notificationProvider = useNotificationProvider();
@@ -52,6 +56,40 @@ function App() {
         <Refine
           dataProvider={dataProvider}
           authProvider={authProvider}
+          accessControlProvider={{
+            can: async ({ resource }) => {
+              const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+              if (userError) throw userError;
+              if (!userData.user) return { can: false };
+
+              const { data: profile, error: profileError } = await supabaseClient
+                .from("user_profiles")
+                .select("role")
+                .eq("id", userData.user.id)
+                .maybeSingle();
+
+              if (profileError) throw profileError;
+              if (!profile) return { can: false, reason: "User role is unavailable." };
+
+              if (resource === "settings") {
+                if (profile.role === "admin") return { can: true };
+                const { data: permission, error: permissionError } = await supabaseClient
+                  .from("role_settings_permissions")
+                  .select("can_view_settings")
+                  .eq("role", profile.role)
+                  .maybeSingle();
+
+                if (permissionError) throw permissionError;
+                return { can: permission?.can_view_settings ?? false };
+              }
+
+              if (resource?.startsWith("admin")) {
+                return { can: profile.role === "admin" };
+              }
+
+              return { can: true };
+            },
+          }}
           notificationProvider={notificationProvider}
           resources={[
             {
@@ -150,6 +188,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/invite/:token" element={<InvitePage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             {/* Protected Routes */}
             <Route
@@ -172,7 +211,8 @@ function App() {
               <Route path="/contacts" element={<ContactsPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/import" element={<ImportPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings" element={<SettingsAccessGuard><SettingsPage /></SettingsAccessGuard>} />
+              <Route path="/profile" element={<ProfilePage />} />
               <Route path="/admin" element={<AdminDashboardPage />} />
               <Route path="/admin/users" element={<UserManagementPage />} />
               <Route path="/admin/audit-logs" element={<AuditLogsPage />} />

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { UserProfileCard } from "@/components/user-profile-card";
 import {
   BarChart3,
   AlertCircle,
@@ -23,6 +24,7 @@ import {
   Settings as SettingsIcon,
   TrendingUp,
   Clock,
+  FileText,
 } from "lucide-react";
 import type { UserProfile, AuditLogEntry } from "@/types";
 
@@ -42,13 +44,6 @@ export default function AdminDashboardPage() {
   const [recentActivity, setRecentActivity] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // Redirect if not admin
-  useEffect(() => {
-    if (!roleLoading && !isAdmin) {
-      router("/dashboard");
-    }
-  }, [isAdmin, roleLoading, router]);
 
   // Fetch data
   useEffect(() => {
@@ -98,7 +93,7 @@ export default function AdminDashboardPage() {
     fetchData();
   }, [isAdmin]);
 
-  if (roleLoading || loading) {
+  if (roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px] p-6">
         <p className="text-muted-foreground">Loading admin dashboard...</p>
@@ -107,14 +102,13 @@ export default function AdminDashboardPage() {
   }
 
   if (!isAdmin) {
+    return <div className="space-y-6 p-6"><UserProfileCard /></div>;
+  }
+
+  if (loading) {
     return (
-      <div className="space-y-6 p-6 max-w-2xl mx-auto mt-12">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            You do not have permission to access this page. Admin access required.
-          </AlertDescription>
-        </Alert>
+      <div className="flex items-center justify-center min-h-[400px] p-6">
+        <p className="text-muted-foreground">Loading admin dashboard...</p>
       </div>
     );
   }
@@ -183,6 +177,25 @@ export default function AdminDashboardPage() {
             System overview and user management metrics
           </p>
         </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: "User Management", path: "/admin/users", icon: Users },
+          { label: "Audit Logs", path: "/admin/audit-logs", icon: FileText },
+          { label: "Admin Settings", path: "/admin/settings", icon: SettingsIcon },
+          { label: "Dashboard", path: "/admin", icon: BarChart3 },
+        ].map(({ label, path, icon: Icon }) => (
+          <Button
+            key={path}
+            variant="outline"
+            className="h-auto justify-start gap-3 p-4"
+            onClick={() => router(path)}
+          >
+            <Icon className="h-5 w-5" />
+            {label}
+          </Button>
+        ))}
       </div>
 
       {error && (

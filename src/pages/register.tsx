@@ -13,6 +13,8 @@ import type { PendingInvitation } from "@/types";
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [firstName, setFirstName] = useState("");
+  const [surname, setSurname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -33,10 +35,14 @@ export default function RegisterPage() {
     // Validate invite token if provided
     if (inviteToken) {
       const validateInvite = async () => {
-        const inv = await getInvitationByToken(inviteToken);
-        setInvitation(inv);
+        try {
+          const inv = await getInvitationByToken(inviteToken);
+          setInvitation(inv);
+        } catch (validationError) {
+          setError(validationError instanceof Error ? validationError.message : "Unable to validate invitation.");
+        }
       };
-      validateInvite();
+      void validateInvite();
     }
   }, [inviteEmail, inviteToken]);
 
@@ -62,12 +68,14 @@ export default function RegisterPage() {
       const { error: signUpError, data } = await supabaseClient.auth.signUp({
         email,
         password,
+        options: {
+          data: { full_name: `${firstName.trim()} ${surname.trim()}`.trim() },
+        },
       });
 
       if (signUpError) throw signUpError;
 
-      const userId = data.user?.id;
-      if (!userId) throw new Error("Failed to create user account");
+      if (!data.user?.id) throw new Error("Failed to create user account");
 
       // Auto-login after successful registration
       const { error: signInError } = await supabaseClient.auth.signInWithPassword({
@@ -77,33 +85,8 @@ export default function RegisterPage() {
 
       if (signInError) throw signInError;
 
-      // Determine the role based on invitation or default
-      const userRole = invitation?.role || "viewer";
-
-      // Create user profile - ALWAYS do this for every new user
-      const { error: profileError } = await supabaseClient
-        .from("user_profiles")
-        .upsert([
-          {
-            id: userId,
-            email,
-            role: userRole,
-            is_active: true,
-            full_name: email.split("@")[0], // Use email prefix as initial name
-          },
-        ], { onConflict: "id" });
-
-      if (profileError) {
-        console.error("Profile error:", profileError);
-        throw profileError;
-      }
-
-      // If invitation exists, mark it as accepted
       if (invitation && inviteToken) {
-        const accepted = await acceptInvitation(inviteToken);
-        if (!accepted) {
-          console.warn("Failed to mark invitation as accepted");
-        }
+        await acceptInvitation(inviteToken);
       }
 
       setSuccess(true);
@@ -156,6 +139,30 @@ export default function RegisterPage() {
 
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="firstName">First name</Label>
+              <Input
+                id="firstName"
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                disabled={loading || success}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="surname">Surname</Label>
+              <Input
+                id="surname"
+                autoComplete="family-name"
+                value={surname}
+                onChange={(e) => setSurname(e.target.value)}
+                disabled={loading || success}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -167,7 +174,7 @@ export default function RegisterPage() {
                 required
               />
               <p className="text-xs text-gray-500 mt-1">
-                This will be used as your display name initially
+                Your email cannot be changed from your profile.
               </p>
             </div>
 

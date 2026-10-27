@@ -27,12 +27,17 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
+import { useSettingsAccess } from "@/hooks/use-settings-access";
 import { ChevronRight, ListIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const { open } = useShadcnSidebar();
   const { menuItems, selectedKey } = useMenu();
+  const { canViewSettings, loading: settingsLoading } = useSettingsAccess();
+  const visibleMenuItems = menuItems.filter((item) =>
+    item.name !== "settings" || (!settingsLoading && canViewSettings)
+  );
 
   return (
     <ShadcnSidebar collapsible="icon" className={cn("border-none")}>
@@ -55,7 +60,7 @@ export function Sidebar() {
           },
         )}
       >
-        {menuItems.map((item: TreeMenuItem) => (
+        {visibleMenuItems.map((item: TreeMenuItem) => (
           <SidebarItem
             key={item.key || item.name}
             item={item}

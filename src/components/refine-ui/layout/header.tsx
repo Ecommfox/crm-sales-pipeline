@@ -12,7 +12,9 @@ import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "@/components/refine-ui/theme/theme-toggle"
 import { UserAvatar } from "@/components/refine-ui/layout/user-avatar"
 import { useSidebar, SidebarTrigger } from "@/components/ui/sidebar"
-import { LogOutIcon } from "lucide-react"
+import { useNavigate } from "react-router"
+import { useUserRole } from "@/hooks/use-user-role"
+import { LogOutIcon, Shield, UserRound } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export const Header = () => {
@@ -119,7 +121,8 @@ function MobileHeader() {
 
 const UserDropdown = () => {
   const { mutate: logout, isPending: isLoggingOut } = useLogout()
-
+  const navigate = useNavigate()
+  const { isAdmin, loading: roleLoading } = useUserRole()
   const authProvider = useActiveAuthProvider()
 
   if (!authProvider?.getIdentity) {
@@ -132,6 +135,16 @@ const UserDropdown = () => {
         <UserAvatar />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => navigate("/profile")}>
+          <UserRound />
+          <span>My profile</span>
+        </DropdownMenuItem>
+        {!roleLoading && isAdmin && (
+          <DropdownMenuItem onClick={() => navigate("/admin")}>
+            <Shield />
+            <span>Admin page</span>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           onClick={() => {
             logout()

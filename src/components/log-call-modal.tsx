@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 
 import { dataProvider } from "@/providers/data";
+import { supabaseClient } from "@/lib/supabaseClient";
 import type { Lead, CallResult, CallType, Stage } from "@/types";
 
 // ── Options ──────────────────────────────────────────────────────────────────
@@ -107,6 +108,10 @@ export function LogCallModal({ lead, open, onOpenChange, onSuccess }: LogCallMod
     if (!lead || !validate()) return;
     setIsLoading(true);
     try {
+      const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+      if (userError) throw userError;
+      if (!userData.user) throw new Error("You must be signed in to log a call.");
+
       const now = new Date().toISOString();
 
       // 1. Update the lead record
@@ -132,6 +137,7 @@ export function LogCallModal({ lead, open, onOpenChange, onSuccess }: LogCallMod
           leadStatusAfter: newStage as Stage,
           comment: comment.trim(),
           teleoperator: lead.teleoperateurAppel ?? "Opérateur",
+          userId: userData.user.id,
         },
       });
 

@@ -10,14 +10,38 @@
 
 This will create all required tables with proper relationships and indexes.
 
-## Step 2: Configure RLS (Row Level Security)
+## Step 2: Apply the Account and Access Migration
+
+The app expects the existing `user_profiles`, `audit_logs`, and `pending_invitations`
+tables. Verify these tables before running `admin-access-migration.sql`; the migration
+does not recreate them. Run that migration in the Supabase SQL Editor to repair the
+recursive `user_profiles` RLS policy, securely handle invitation tokens, create new
+profiles with the viewer role, add role-based settings access, and associate new call
+logs with their authenticated user.
+
+The migration intentionally replaces policies on `user_profiles` and
+`pending_invitations`. It does not modify `audit_logs` or the policies on CRM data tables.
+
+## Step 3: Configure RLS (Row Level Security)
 
 The SQL script includes basic RLS policies. For production, consider:
 - Enabling multi-tenancy
 - Adding user-based access controls
 - Restricting scoring settings to admin-only
 
-## Step 3: Test the Connection
+## Step 4: Configure Password Reset Email
+
+In **Authentication → URL Configuration**, add the deployed app's `/reset-password`
+URL and the local development callback (for example,
+`http://localhost:5173/reset-password`) to the allowed redirect URLs.
+
+Supabase Auth sends reset emails through its default sender when custom SMTP is not
+configured. For production delivery, configure a verified sender address and SMTP
+credentials under **Authentication → SMTP Settings**, then review the password-reset
+email template under **Authentication → Email Templates**. Keep SMTP credentials in
+the Supabase dashboard; do not put them in `.env.local` or client code.
+
+## Step 5: Test the Connection
 
 The app will automatically use Supabase when you run `npm run dev`:
 - It uses the credentials in `.env.local`

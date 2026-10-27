@@ -33,6 +33,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { UserDetailModal } from "@/components/admin/user-detail-modal";
 import { logUserRoleChange, logUserStatusChange } from "@/lib/auditLogger";
 import { createInvitation, generateInvitationLink, getPendingInvitations } from "@/lib/invitationService";
@@ -53,6 +54,12 @@ export default function UserManagementPage() {
   const [inviting, setInviting] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
+  const [roleSettingsAccess, setRoleSettingsAccess] = useState<Record<UserRole, boolean>>({
+    admin: true,
+    manager: false,
+    teleoperator: false,
+    viewer: false,
+  });
 
   // Redirect if not admin
   useEffect(() => {
@@ -75,6 +82,24 @@ export default function UserManagementPage() {
 
         if (fetchError) throw fetchError;
         setUsers(data || []);
+
+        const { data: permissions, error: permissionsError } = await supabaseClient
+          .from("role_settings_permissions")
+          .select("role, can_view_settings");
+        if (permissionsError) throw permissionsError;
+
+        const access = {
+          admin: true,
+          manager: false,
+          teleoperator: false,
+          viewer: false,
+        };
+        for (const permission of permissions || []) {
+          if (permission.role in access) {
+            access[permission.role as UserRole] = permission.can_view_settings;
+          }
+        }
+        setRoleSettingsAccess(access);
 
         // Fetch pending invitations
         const invitations = await getPendingInvitations();
@@ -141,6 +166,23 @@ export default function UserManagementPage() {
       setUsers(data || []);
     } catch (err: any) {
       setError(err.message || "Failed to update user status");
+    }
+  };
+
+  const updateRoleSettingsAccess = async (role: UserRole, canViewSettings: boolean) => {
+    try {
+      setError("");
+      const { error: updateError } = await supabaseClient
+        .from("role_settings_permissions")
+        .upsert(
+          { role, can_view_settings: canViewSettings, updated_at: new Date().toISOString() },
+          { onConflict: "role" }
+        );
+      if (updateError) throw updateError;
+
+      setRoleSettingsAccess((current) => ({ ...current, [role]: canViewSettings }));
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Failed to update role access.");
     }
   };
 
@@ -470,6 +512,34 @@ export default function UserManagementPage() {
               </Table>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Settings page access by role</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Choose which roles can open the lead scoring settings page. Admin access is always enabled.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {([
+            ["admin", "Admin"],
+            ["manager", "Manager"],
+            ["teleoperator", "Teleoperator"],
+            ["viewer", "Viewer"],
+          ] as const).map(([role, label]) => (
+            <label key={role} className="flex items-center gap-3 text-sm">
+              <Checkbox
+                checked={roleSettingsAccess[role]}
+                disabled={role === "admin"}
+                onCheckedChange={(checked) =>
+                  void updateRoleSettingsAccess(role, checked === true)
+                }
+              />
+              <span>{label} can view settings</span>
+            </label>
+          ))}
         </CardContent>
       </Card>
 

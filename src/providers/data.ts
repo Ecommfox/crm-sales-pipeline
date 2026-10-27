@@ -64,6 +64,7 @@ const CALL_LOGS_MAP: Record<string, string> = {
   leadStatusAfter: "statut_lead",
   comment: "commentaire",
   teleoperator: "teleoperateur",
+  userId: "user_id",
   date: "created_at",
   createdAt: "created_at",
 };
@@ -232,6 +233,8 @@ export const dataProvider: DataProvider = {
         data: result.data.map((row) => fromSupabaseRow(params.resource, row as Record<string, unknown>)),
       };
     } catch (error) {
+      if (import.meta.env.PROD) throw error;
+
       // Fallback to mock data if Supabase is unavailable
       console.warn(`Supabase query failed for resource "${params.resource}". Using mock data.`, error);
       
@@ -264,6 +267,8 @@ export const dataProvider: DataProvider = {
         data: fromSupabaseRow(params.resource, result.data as Record<string, unknown>),
       };
     } catch (error) {
+      if (import.meta.env.PROD) throw error;
+
       // Fallback to mock data if Supabase is unavailable
       console.warn(`Supabase query failed for resource "${params.resource}". Using mock data.`, error);
       

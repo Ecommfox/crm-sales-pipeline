@@ -22,6 +22,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Phone, Filter, SlidersHorizontal, UserPlus, Star, Calendar, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabaseClient } from "@/lib/supabaseClient";
 import { ScheduleAppointmentModal } from "@/components/schedule-appointment-modal";
 import { ScoreBadge } from "@/components/score-badge";
 import {
@@ -136,38 +137,53 @@ function LogCallModal({ lead, open, onClose }: { lead: Lead | null; open: boolea
   const [callType, setCallType] = useState("Normal");
   const [comment, setComment] = useState("");
   const [newStage, setNewStage] = useState("");
+  const [callError, setCallError] = useState("");
+  const [savingCall, setSavingCall] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!lead || !callResult) return;
-    const now = new Date().toISOString();
-    createCallLog({
-      resource: "callLogs",
-      values: {
-        leadId: lead.id,
-        callResult,
-        callType: callType,
-        comment,
-        date: now,
-        teleoperator: "Opérateur actuel",
-        leadStatusAfter: newStage || lead.stage,
-      },
-    });
-    updateLead({
-      resource: "leads",
-      id: lead.id,
-      values: {
-        etatAppel: callResult,
-        commentaireTeleoperateur: comment,
-        dateHeureAppel: now,
-        ...(newStage ? { stage: newStage } : {}),
-      },
-    });
-    invalidate({ resource: "leads", invalidates: ["list"] });
-    setCallResult("");
-    setCallType("Normal");
-    setComment("");
-    setNewStage("");
-    onClose();
+    setSavingCall(true);
+    setCallError("");
+    try {
+      const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+      if (userError) throw userError;
+      if (!userData.user) throw new Error("You must be signed in to log a call.");
+
+      const now = new Date().toISOString();
+      createCallLog({
+        resource: "callLogs",
+        values: {
+          leadId: lead.id,
+          callResult,
+          callType: callType,
+          comment,
+          date: now,
+          teleoperator: "Opérateur actuel",
+          userId: userData.user.id,
+          leadStatusAfter: newStage || lead.stage,
+        },
+      });
+      updateLead({
+        resource: "leads",
+        id: lead.id,
+        values: {
+          etatAppel: callResult,
+          commentaireTeleoperateur: comment,
+          dateHeureAppel: now,
+          ...(newStage ? { stage: newStage } : {}),
+        },
+      });
+      invalidate({ resource: "leads", invalidates: ["list"] });
+      setCallResult("");
+      setCallType("Normal");
+      setComment("");
+      setNewStage("");
+      onClose();
+    } catch (error) {
+      setCallError(error instanceof Error ? error.message : "Unable to log this call.");
+    } finally {
+      setSavingCall(false);
+    }
   };
 
   return (
@@ -179,6 +195,7 @@ function LogCallModal({ lead, open, onClose }: { lead: Lead | null; open: boolea
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          {callError && <p className="text-sm text-destructive">{callError}</p>}
           <div className="space-y-1">
             <Label>
               Résultat de l'appel <span className="text-red-500">*</span>
@@ -241,8 +258,8 @@ function LogCallModal({ lead, open, onClose }: { lead: Lead | null; open: boolea
           <DialogClose asChild>
             <Button variant="outline">Annuler</Button>
           </DialogClose>
-          <Button onClick={handleSubmit} disabled={!callResult}>
-            Enregistrer
+          <Button onClick={handleSubmit} disabled={!callResult || savingCall}>
+            {savingCall ? "Enregistrement..." : "Enregistrer"}
           </Button>
         </DialogFooter>
       </DialogContent>
